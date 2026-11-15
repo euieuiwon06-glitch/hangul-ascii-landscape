@@ -368,7 +368,7 @@
     S.forEach((s, k) => s && s.svg.classList.toggle("on", k === i));
   }
   addEventListener("keydown", e => {
-    if (document.activeElement === input || document.querySelector(".overlay.open")) return;
+    if (document.activeElement === input || document.querySelector("#scenes.open, #intro.open")) return;
     if (e.key === "ArrowRight") show(cur + 1);
     if (e.key === "ArrowLeft") show(cur - 1);
   });

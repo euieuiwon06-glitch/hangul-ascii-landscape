@@ -6,9 +6,9 @@
 <title>한글 풍경</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700;900&family=Cinzel:wght@700&family=EB+Garamond:ital,wght@1,600&display=swap" rel="stylesheet">
 <style>
-  :root { --ink: #1b1b1b; --glass: rgba(255,255,255,.28); --globe: #2d5ef0; }
+  :root { --ink: #111; }
   html, body { margin: 0; height: 100%; background: #fff; overflow: hidden; }
   body { font-family: 'Noto Sans KR', sans-serif; color: var(--ink); }
   button { font: inherit; color: inherit; }
@@ -19,8 +19,8 @@
   body.over-animal #stage { cursor: grab; }
   body.dragging, body.dragging #stage { cursor: grabbing; }
 
-  /* 아래: 입력창 + 동물 목록 버튼 */
-  .dock { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+  /* 아래: 입력창 + ANIMALS 버튼 */
+  .dock { position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 5;
           display: flex; gap: 8px; align-items: center; transition: opacity .2s ease; }
   body.dragging .dock { opacity: .3; pointer-events: none; }
   .pill { display: flex; align-items: center; border-radius: 999px; height: 34px; box-sizing: border-box;
@@ -29,7 +29,9 @@
   form input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; padding: 0;
                font: 13px/1 'Noto Sans KR', sans-serif; color: #111; text-align: center; }
   form input::placeholder { color: #999; }
-  #listBtn { border: 0; padding: 0 14px; gap: 4px; cursor: pointer; white-space: nowrap; }
+  #listBtn { border: 0; padding: 0 14px 0 16px; gap: 7px; cursor: pointer; white-space: nowrap;
+             font: 700 12px/1 'Cinzel', serif; letter-spacing: .09em; }
+  #listBtn svg { width: 9px; height: 9px; flex: none; }
   #listBtn:hover { background: #fff; }
   #msg { position: fixed; left: 50%; bottom: 62px; transform: translateX(-50%);
          max-width: calc(100vw - 32px); padding: 8px 14px; border-radius: 999px;
@@ -37,89 +39,99 @@
          text-align: center; pointer-events: none; }
   #msg:empty { display: none; }
 
-  /* 오른쪽 위: 배경 고르기(점 지구본) */
-  #globe { position: fixed; top: 18px; right: 18px; width: 44px; height: 44px; border-radius: 50%;
-           border: 0; padding: 0; background: var(--globe); cursor: pointer;
-           box-shadow: 0 1px 10px rgba(0,0,0,.15); display: grid; place-items: center; }
-  #globe:hover { filter: brightness(1.08); }
-  #globe svg { width: 34px; height: 34px; }
+  /* 오른쪽 위: 배경 고르기(점 지구본, 검정) */
+  #globe { position: fixed; top: clamp(14px, 1.6vw, 28px); right: clamp(14px, 1.6vw, 28px); z-index: 30;
+           width: clamp(38px, 2.9vw, 50px); height: clamp(38px, 2.9vw, 50px); border: 0; padding: 0;
+           background: none; cursor: pointer; display: grid; place-items: center;
+           filter: drop-shadow(0 1px 6px rgba(255,255,255,.6)); transition: transform .2s; }
+  #globe:hover { transform: scale(1.06); }
+  #globe svg { width: 100%; height: 100%; display: block; }
 
-  /* 겹쳐 뜨는 화면 공통 */
-  .overlay { position: fixed; inset: 0; z-index: 10; display: none; }
-  .overlay.open { display: block; }
-  .close { position: absolute; top: 18px; right: 18px; width: 44px; height: 44px; border: 0; border-radius: 50%;
-           background: none; cursor: pointer; display: grid; place-items: center; }
-  .close:hover { background: rgba(255,255,255,.35); }
-  .close svg { width: 22px; height: 22px; stroke: var(--ink); stroke-width: 1.6; }
-
-  /* 배경 고르기: 흐린 바탕 + 좌우로 넘기는 카드 */
-  #scenes { backdrop-filter: blur(18px) saturate(1.1); -webkit-backdrop-filter: blur(18px) saturate(1.1);
-            background: rgba(255,255,255,.12); touch-action: none; user-select: none; }
-  #scenes .close svg { stroke: #fff; filter: drop-shadow(0 1px 2px rgba(0,0,0,.4)); }
+  /* 배경 고르기: 흐린 바탕 + 좌우로 넘기는 카드 (닫기 = 빈 곳 누르기 · Esc) */
+  #scenes { position: fixed; inset: 0; z-index: 20; overflow: hidden; touch-action: none; user-select: none;
+            background: rgba(30,26,24,.06);
+            backdrop-filter: blur(18px) saturate(1.05); -webkit-backdrop-filter: blur(18px) saturate(1.05);
+            opacity: 0; pointer-events: none; transition: opacity .35s ease; }
+  #scenes.open { opacity: 1; pointer-events: auto; }
   #track { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
   .card { position: absolute; left: 0; top: 0; width: var(--cw); aspect-ratio: 1280 / 717; border: 0; padding: 0;
           border-radius: 18px; overflow: hidden; cursor: pointer; background: #fff;
-          box-shadow: 0 10px 40px rgba(0,0,0,.18); transition: transform .45s cubic-bezier(.2,.7,.2,1), filter .45s; }
+          box-shadow: 0 10px 40px rgba(0,0,0,.14); transition: transform .45s cubic-bezier(.2,.7,.2,1), filter .45s; }
   .card img { width: 100%; height: 100%; display: block; object-fit: cover; pointer-events: none; }
-  .card.side { filter: brightness(.62); }
+  .card.side { filter: brightness(.9); }
   #scenes.dragging .card { transition: none; }
-  #sceneDots { position: absolute; left: 50%; bottom: 40px; transform: translateX(-50%); display: flex; gap: 8px; }
-  #sceneDots i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.55); }
-  #sceneDots i.on { background: #fff; }
 
-  /* 동물 목록: 유리 패널 */
-  #list { display: none; place-items: center; }
-  #list.open { display: grid; }
-  .panel { position: relative; width: min(1100px, calc(100vw - 48px)); max-height: calc(100vh - 120px); overflow: auto;
-           box-sizing: border-box; padding: 34px 40px 40px; border-radius: 36px;
-           background: var(--glass); backdrop-filter: blur(22px) saturate(1.2); -webkit-backdrop-filter: blur(22px) saturate(1.2);
-           box-shadow: 0 10px 50px rgba(0,0,0,.12); }
-  .panel h2 { margin: 0 56px 26px; text-align: center; font-size: clamp(17px, 2.2vw, 24px); font-weight: 700; }
-  .panel .close { top: 22px; right: 22px; }
-  #grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 18px 10px; }
-  #grid button { border: 0; background: none; cursor: pointer; padding: 10px 4px; border-radius: 16px;
-                 display: flex; flex-direction: column; align-items: center; gap: 6px; }
-  #grid button:hover { background: rgba(255,255,255,.35); }
-  #grid canvas { width: 110px; height: 76px; }
-  #grid b { font-size: 13px; letter-spacing: .12em; font-weight: 700; }
-  #grid small { font-size: 11px; opacity: .7; }
-  @media (max-width: 640px) {
-    #grid { grid-template-columns: repeat(3, 1fr); }
-    .panel { padding: 26px 18px 24px; border-radius: 26px; }
-    #grid canvas { width: 84px; height: 58px; }
+  /* 동물 목록 — letter-zoo 팝업과 같은 구성(입력창 바로 위 유리 패널) */
+  #intro { position: fixed; inset: 0; z-index: 10; display: flex; justify-content: center; align-items: flex-end;
+           padding: 16px 16px 70px; box-sizing: border-box;
+           opacity: 0; pointer-events: none; transition: opacity .35s ease; }
+  #intro.open { opacity: 1; pointer-events: auto; }
+  .panel { position: relative; container-type: inline-size;
+           width: min(1180px, 92vw, calc((100vh - 110px) / .52));
+           padding: 1.3cqw 0 3.6cqw; border-radius: 4.2cqw;
+           background: rgba(255,255,255,.17);
+           -webkit-backdrop-filter: blur(13px) saturate(1.1); backdrop-filter: blur(13px) saturate(1.1);
+           box-shadow: 0 30px 70px -45px rgba(20,40,30,.5);
+           color: var(--ink); text-align: center;
+           transform: translateY(10px) scale(.985); transition: transform .45s cubic-bezier(.22,1,.36,1); }
+  #intro.open .panel { transform: none; }
+  .panel h2 { font: italic 600 3.05cqw/1.15 "EB Garamond", serif; margin: 2.2cqw 8cqw 0; }
+  .panel .x { position: absolute; top: 1.9cqw; right: 3.6cqw; width: 4.4cqw; height: 4.4cqw;
+              display: grid; place-items: center; border: 0; background: none; color: var(--ink);
+              cursor: pointer; border-radius: 50%; }
+  .panel .x svg { width: 2.9cqw; height: 2.9cqw; }
+  .grid { width: 82.8cqw; margin: 4.6cqw auto 0; display: grid; grid-template-columns: repeat(5, 1fr); row-gap: 5cqw; }
+  .tile { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: .75cqw;
+          border: 0; background: none; padding: 0; cursor: pointer; }
+  .tile .ic { height: 6.4cqw; display: flex; align-items: flex-end; }
+  .tile svg { display: block; fill: var(--ink); stroke: var(--ink); }
+  .tile b { font: 700 1.5cqw/1 "Cinzel", serif; letter-spacing: .09em; }
+  .tile:hover .ic { transform: translateY(-2px); transition: transform .2s; }
+  @media (max-width: 700px) {
+    .panel { width: 92vw; padding: 5cqw 4cqw 4cqw; border-radius: 7cqw; }
+    .panel h2 { font-size: 6cqw; margin: 0 9cqw 5cqw; }
+    .panel .x { top: 3.5cqw; right: 4cqw; width: 9cqw; height: 9cqw; }
+    .panel .x svg { width: 6cqw; height: 6cqw; }
+    .grid { width: auto; margin: 0; grid-template-columns: repeat(3, 1fr); row-gap: 8cqw; }
+    .tile .ic { height: auto; }
+    .tile { gap: 1.6cqw; }
+    .tile b { font-size: 3.3cqw; }
   }
 </style>
 </head>
 <body>
 <div id="stage" aria-label="동물을 놓을 초원"></div>
 
-<button id="globe" aria-label="배경 고르기"></button>
+<button id="globe" aria-label="배경 고르기" aria-haspopup="dialog"></button>
 
 <div id="msg" aria-live="polite"></div>
 <div class="dock">
   <form id="ask" class="pill" autocomplete="off">
     <input id="name" placeholder="이름을 입력하세요" aria-label="동물 이름" spellcheck="false" enterkeyhint="go">
   </form>
-  <button id="listBtn" class="pill" aria-haspopup="dialog">동물 목록 ↗</button>
+  <button id="listBtn" class="pill" aria-haspopup="dialog">ANIMALS
+    <svg viewBox="5.9 5.9 12.2 12.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
+  </button>
 </div>
 
-<div id="scenes" class="overlay" role="dialog" aria-label="배경 고르기">
+<div id="scenes" role="dialog" aria-modal="true" aria-label="배경 고르기">
   <div id="track"></div>
-  <div id="sceneDots"></div>
-  <button class="close" data-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
 </div>
 
-<div id="list" class="overlay" role="dialog" aria-label="동물 목록">
+<div id="intro" role="dialog" aria-modal="true" aria-labelledby="introTitle">
   <div class="panel">
-    <h2>동물 이름을 입력하고 Enter를 누르세요</h2>
-    <button class="close" data-close aria-label="닫기"><svg viewBox="0 0 24 24"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
-    <div id="grid"></div>
+    <button class="x" type="button" aria-label="닫기">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19"/></svg>
+    </button>
+    <h2 id="introTitle">Type an animal name and press Enter.</h2>
+    <div class="grid"></div>
   </div>
 </div>
 
-<script src="scenes.js?v=202611152256"></script>
-<script src="animals.js?v=202611152256"></script>
-<script src="zoo.js?v=202611152256"></script>
-<script src="ui.js?v=202611152256"></script>
+<script src="scenes.js?v=202611152310"></script>
+<script src="animals.js?v=202611152310"></script>
+<script src="sil.js?v=202611152310"></script>
+<script src="zoo.js?v=202611152310"></script>
+<script src="ui.js?v=202611152310"></script>
 </body>
 </html>
