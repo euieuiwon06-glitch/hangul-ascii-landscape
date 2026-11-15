@@ -1,13 +1,13 @@
 // 한글 아스키 풍경 + 동물
-// 동물은 따로 그리지 않는다: 실루엣이 차지하는 칸의 배경 글자를 동물 글자·색으로 "바꿔 끼운다".
-// 움직이거나 크기를 바꾸면 이전 칸은 원래 배경 글자로 돌아가고 새 칸이 바뀐다.
+// 동물은 따로 그리지 않는다: 실루엣이 차지하는 칸의 배경 글자는 그대로 두고 색만 동물 색으로 바꾼다.
+// 움직이거나 크기를 바꾸면 떠난 칸은 원래 색으로 돌아가고 새 칸이 동물 색으로 물든다.
 (() => {
   const CONFIG = {
     scale: 1.3,          // 처음 나타날 때 크기(도형 단위 → 칸 수)
     scaleMin: 0.6, scaleMax: 2.6, scaleStep: 0.1,   // 누른 채 휠 1칸당
     cover: 0.38,         // 칸이 이 비율 이상 덮이면 동물 칸
-    fillChar: "ㅁ",      // 면 글자
-    edgeDarken: 0.62,    // 외곽선 글자 = 동물색 × 이 값
+    fillChar: "ㅁ",      // 배경 칸이 비어 있을 때만 쓰는 글자
+    lineDarken: 0.62,    // 귀·날개 같은 안쪽 선 = 동물색 × 이 값
     eyeColor: "#1e1e1e",
   };
   const ORDER = ["32", "30"];
@@ -109,7 +109,7 @@
         let ch, kind;
         if (eyes.has(`${r},${c}`)) { ch = "*"; kind = "eye"; }
         else if (edge) { ch = dirChar(cov, r, c); kind = "edge"; }
-        else if (lcov[r * W + c] > 0.12) { ch = dirChar(lcov, r, c); kind = "edge"; }
+        else if (lcov[r * W + c] > 0.12) { ch = dirChar(lcov, r, c); kind = "line"; }
         else { ch = CONFIG.fillChar; kind = "fill"; }
         let cc = c;
         if (flip) { cc = W - 1 - c; ch = ch === "/" ? "\\" : ch === "\\" ? "/" : ch; }
@@ -147,12 +147,14 @@
     c0 = Math.min(Math.max(c0, v.c0), Math.max(v.c0, v.c1 - sil.W + 1));
     r0 = Math.min(Math.max(r0, v.r0), Math.max(v.r0, v.r1 - sil.H + 1));
     an.fc = c0 + Math.floor(sil.W / 2); an.fr = r0 + sil.H - 1;
-    const col = ANIMALS[an.key].color, edge = shade(col, CONFIG.edgeDarken);
+    const col = ANIMALS[an.key].color, line = shade(col, CONFIG.lineDarken);
     const map = new Map();
     for (const p of sil.cells) {
       const rr = r0 + p.r, cc = c0 + p.c;
       if (rr < 0 || cc < 0 || rr >= sc.rows || cc >= sc.cols) continue;
-      map.set(rr * sc.cols + cc, { ch: p.ch, color: p.kind === "eye" ? CONFIG.eyeColor : p.kind === "edge" ? edge : col });
+      // 글자는 그 칸의 원래 배경 글자 그대로, 색만 동물 색으로
+      const i = rr * sc.cols + cc, ch = sc.cells[i].ch === " " ? CONFIG.fillChar : sc.cells[i].ch;
+      map.set(i, { ch, color: p.kind === "eye" ? CONFIG.eyeColor : p.kind === "line" ? line : col });
     }
     return map;
   }
