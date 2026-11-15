@@ -35,7 +35,7 @@
                font: 400 13px/1 var(--ui); color: #111; text-align: center; }   /* 입력창만 SUIT Regular */
   form input::placeholder { color: #999; }
   #listBtn { border: 0; padding: 0 14px 0 16px; gap: 7px; cursor: pointer; white-space: nowrap;
-             font: 100 12px/1 var(--ui); letter-spacing: .09em; }
+             font: 100 12px/1 var(--ui); letter-spacing: .02em; }
   #listBtn svg { width: 9px; height: 9px; flex: none; }
   #listBtn:hover { background: #fff; }
   #msg { position: fixed; left: 50%; bottom: 62px; transform: translateX(-50%);
@@ -45,12 +45,9 @@
   #msg:empty { display: none; }
 
   /* 오른쪽 위: 배경 고르기(점 지구본, 검정) */
-  #globe { position: fixed; top: clamp(14px, 1.6vw, 28px); right: clamp(14px, 1.6vw, 28px); z-index: 30;
-           width: clamp(38px, 2.9vw, 50px); height: clamp(38px, 2.9vw, 50px); border: 0; padding: 0;
-           background: none; cursor: pointer; display: grid; place-items: center;
-           filter: drop-shadow(0 1px 6px rgba(255,255,255,.6)); transition: transform .2s; }
-  #globe:hover { transform: scale(1.06); }
-  #globe svg { width: 100%; height: 100%; display: block; }
+  /* 지구본은 배경 글자 자체(zoo.js) — 이 버튼은 그 위의 보이지 않는 누르는 영역 */
+  #globe { position: fixed; z-index: 30; border: 0; padding: 0; background: none; cursor: pointer; border-radius: 50%; }
+  #globe:focus-visible { outline: 2px solid #111; outline-offset: 2px; }
 
   /* 배경 고르기: 흐린 바탕 + 좌우로 넘기는 카드 (닫기 = 빈 곳 누르기 · Esc) */
   #scenes { position: fixed; inset: 0; z-index: 20; overflow: hidden; touch-action: none; user-select: none;
@@ -90,7 +87,7 @@
           border: 0; background: none; padding: 0; cursor: pointer; }
   .tile .ic { height: 6.4cqw; display: flex; align-items: flex-end; }
   .tile svg { display: block; fill: var(--ink); stroke: var(--ink); }
-  .tile b { font: 100 1.5cqw/1 var(--ui); letter-spacing: .09em; }
+  .tile b { font: 100 1.5cqw/1 var(--ui); letter-spacing: .02em; }
   .tile:hover .ic { transform: translateY(-2px); transition: transform .2s; }
   @media (max-width: 700px) {
     .panel { width: 92vw; padding: 5cqw 4cqw 4cqw; border-radius: 7cqw; }
@@ -114,7 +111,7 @@
   <form id="ask" class="pill" autocomplete="off">
     <input id="name" placeholder="이름을 입력하세요" aria-label="동물 이름" spellcheck="false" enterkeyhint="go">
   </form>
-  <button id="listBtn" class="pill" aria-haspopup="dialog">ANIMALS
+  <button id="listBtn" class="pill" aria-haspopup="dialog">동물 목록
     <svg viewBox="5.9 5.9 12.2 12.2" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg>
   </button>
 </div>
@@ -128,15 +125,15 @@
     <button class="x" type="button" aria-label="닫기">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M5 5l14 14M19 5 5 19"/></svg>
     </button>
-    <h2 id="introTitle">Type an animal name and press Enter.</h2>
+    <h2 id="introTitle">동물 이름을 입력하고 엔터를 누르세요</h2>
     <div class="grid"></div>
   </div>
 </div>
 
-<script src="scenes.js?v=202611152313"></script>
-<script src="animals.js?v=202611152313"></script>
-<script src="sil.js?v=202611152313"></script>
-<script src="zoo.js?v=202611152313"></script>
-<script src="ui.js?v=202611152313"></script>
+<script src="scenes.js?v=202611152316"></script>
+<script src="animals.js?v=202611152316"></script>
+<script src="sil.js?v=202611152316"></script>
+<script src="zoo.js?v=202611152316"></script>
+<script src="ui.js?v=202611152316"></script>
 </body>
 </html>

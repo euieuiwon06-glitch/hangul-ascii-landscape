@@ -12,6 +12,7 @@
     thinGlyphs: "ㅣㅡ|-_.,'`:;!?/\\()[]{}<>~^*+=¨˚°´˝·‥…",   // 색이 거의 안 실리는 가는 글자
     denseGlyphs: "ㅁㅂㅍㅎㅌㄹㅊ",   // 동물 칸에서 가는 글자만 이걸로 바꿔 면이 또렷하게
     eyeColor: "#1e1e1e",
+    globeColor: "#111111",   // 오른쪽 위 지구본 글자색
     saturate: 1.35,      // 동물색 채도 배율
     darken: 0.86,        // 동물색 밝기 배율(1=그대로)
     animalWeight: 900,   // 동물 칸 글자 굵기(배경은 그대로)
@@ -247,6 +248,8 @@
       const cell = sc.cells[i];
       let v = cell;
       for (const an of sc.animals) { const m = an.map && an.map.get(i); if (m) v = m; }
+      const gl = sc.globe && sc.globe.get(i);   // 지구본 칸은 동물보다 위
+      if (gl) v = gl;
       if (!cell.el) {
         if (v === cell) continue;
         cell.el = makeText(sc.g, Math.floor(i / sc.cols), i % sc.cols, " ", cell.color);
@@ -254,7 +257,8 @@
       if (cell.el.textContent !== v.ch) cell.el.textContent = v.ch;
       if (cell.el.getAttribute("fill") !== v.color) cell.el.setAttribute("fill", v.color);
       if (v === cell) cell.el.removeAttribute("font-weight");
-      else cell.el.setAttribute("font-weight", CONFIG.animalWeight);
+      else cell.el.setAttribute("font-weight", v.weight || CONFIG.animalWeight);
+      if (v.op) cell.el.setAttribute("fill-opacity", v.op); else cell.el.removeAttribute("fill-opacity");
     }
   }
   function hit(sc, i) {
@@ -297,7 +301,7 @@
     const v = input.value.trim().toLowerCase();
     if (!v) return;
     const key = NAMES[v];
-    if (!key) { setMsg("없는 동물이에요 — " + Object.keys(ANIMALS).join(" · "), 5000); return; }
+    if (!key) { setMsg("없는 동물이에요 — " + Object.values(ANIMALS).map(x => x.ko).join(" · "), 5000); return; }
     spawn(S[cur], key);
     input.value = "";
     setMsg("");
@@ -359,6 +363,42 @@
   // ---------- 장면 바꾸기 (장면은 처음 볼 때 만듦) ----------
   let cur = -1;
   const S = ORDER.map(() => null);
+  // ---------- 지구본: 오른쪽 위 배경 글자를 지구본 무늬대로 검정으로 (육지 = 굵게, 바다 = 옅게) ----------
+  const GLOBE = [
+    "...###...",
+    ".####.##.",
+    "####..###",
+    "##.....##",
+    "#.....###",
+    "#....####",
+    ".#..####.",
+    "..#.###..",
+    "....##...",
+  ];
+  const globeBtn = document.getElementById("globe");
+  function placeGlobe(sc) {
+    const v = visible(sc), n = GLOBE.length, R = n / 2;
+    const c0 = v.c1 - n - 1, r0 = v.r0 + 1;
+    const old = sc.globe || new Map(), map = new Map();
+    for (let y = 0; y < n; y++)
+      for (let x = 0; x < n; x++) {
+        const dx = x + 0.5 - R, dy = y + 0.5 - R;
+        if (dx * dx + dy * dy > R * R) continue;
+        const i = (r0 + y) * sc.cols + c0 + x, o = sc.cells[i].ch;
+        const land = GLOBE[y][x] === "#";
+        const ch = o === " " || (land && CONFIG.thinGlyphs.includes(o)) ? CONFIG.denseGlyphs[(i * 7) % CONFIG.denseGlyphs.length] : o;
+        map.set(i, land ? { ch, color: CONFIG.globeColor, weight: 900 } : { ch, color: CONFIG.globeColor, weight: 400, op: 0.42 });
+      }
+    sc.globe = map;
+    redraw(sc, new Set([...old.keys(), ...map.keys()]));
+    // 누르는 영역(보이지 않는 버튼)을 지구본 칸 위에 맞춤
+    const m = sc.svg.getScreenCTM();
+    globeBtn.style.left = (m.a * c0 * CELL + m.e) + "px";
+    globeBtn.style.top = (m.d * r0 * CELL + m.f) + "px";
+    globeBtn.style.width = globeBtn.style.height = (m.a * n * CELL) + "px";
+  }
+  addEventListener("resize", () => { if (S[cur]) placeGlobe(S[cur]); });
+
   function show(i) {
     i = (i + S.length) % S.length;
     if (i === cur) return;
@@ -366,6 +406,7 @@
     if (!S[i]) S[i] = buildScene(ORDER[i]);
     cur = i;
     S.forEach((s, k) => s && s.svg.classList.toggle("on", k === i));
+    placeGlobe(S[i]);
   }
   addEventListener("keydown", e => {
     if (document.activeElement === input || document.querySelector("#scenes.open, #intro.open")) return;

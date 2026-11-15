@@ -4,42 +4,13 @@
   const $ = id => document.getElementById(id);
   const input = $("name");
 
-  // ---------- 점으로 된 지구본 아이콘 (검정: 육지 = 채운 점, 바다 = 고리) ----------
-  const LAND = [
-    "....##.....",
-    "..#####.#..",
-    ".######.##.",
-    "##.####..##",
-    "#....##....",
-    "#.....####.",
-    ".#...#####.",
-    "..#..####..",
-    "...#.###...",
-    ".....##....",
-    "...........",
-  ];
-  (function globe() {
-    const n = LAND.length, r = n / 2, step = 34 / n;
-    let dots = "";
-    for (let y = 0; y < n; y++)
-      for (let x = 0; x < n; x++) {
-        const dx = x + 0.5 - r, dy = y + 0.5 - r;
-        if (dx * dx + dy * dy > (r - 0.15) * (r - 0.15)) continue;
-        const cx = ((x + 0.5) * step).toFixed(2), cy = ((y + 0.5) * step).toFixed(2);
-        dots += LAND[y][x] === "#"
-          ? `<circle cx="${cx}" cy="${cy}" r="${(step * 0.42).toFixed(2)}" fill="currentColor"/>`
-          : `<circle cx="${cx}" cy="${cy}" r="${(step * 0.3).toFixed(2)}" fill="none" stroke="currentColor" stroke-width="${(step * 0.13).toFixed(2)}" opacity=".8"/>`;
-      }
-    $("globe").innerHTML = `<svg viewBox="0 0 34 34" aria-hidden="true" style="color:#111">${dots}</svg>`;
-  })();
-
   // ---------- 배경 고르기 ----------
   const scenes = $("scenes"), track = $("track");
   const cards = Z.ORDER.map((id, k) => {
     const b = document.createElement("button");
     b.className = "card";
     b.setAttribute("aria-label", `배경 ${k + 1}`);
-    b.innerHTML = `<img src="thumbs/${id}.jpg?v=202611152313" alt="" draggable="false">`;
+    b.innerHTML = `<img src="thumbs/${id}.jpg?v=202611152316" alt="" draggable="false">`;
     track.appendChild(b);
     return b;
   });
@@ -117,8 +88,8 @@
       const b = document.createElement("button");
       b.className = "tile";
       b.type = "button";
-      b.setAttribute("aria-label", `${key} (${a.ko})`);
-      b.innerHTML = `<div class="ic"><svg viewBox="0 0 ${g.w} ${g.h}" style="width:${(g.w * u).toFixed(2)}cqw;height:${(g.h * u).toFixed(2)}cqw" aria-hidden="true">${g.inner}</svg></div><b>${key.toUpperCase()}</b>`;
+      b.setAttribute("aria-label", a.ko);
+      b.innerHTML = `<div class="ic"><svg viewBox="0 0 ${g.w} ${g.h}" style="width:${(g.w * u).toFixed(2)}cqw;height:${(g.h * u).toFixed(2)}cqw" aria-hidden="true">${g.inner}</svg></div><b>${a.ko}</b>`;
       b.addEventListener("click", () => { closeIntro(); Z.add(key); });
       grid.appendChild(b);
     }
