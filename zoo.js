@@ -3,11 +3,14 @@
 // 움직이거나 크기를 바꾸면 떠난 칸은 원래 색으로 돌아가고 새 칸이 동물 색으로 물든다.
 (() => {
   const CONFIG = {
-    scale: 1.3,          // 처음 나타날 때 크기(도형 단위 → 칸 수)
+    scale: 1.5,          // 처음 나타날 때 크기(도형 단위 → 칸 수)
     scaleMin: 0.6, scaleMax: 2.6, scaleStep: 0.1,   // 누른 채 휠 1칸당
     cover: 0.38,         // 칸이 이 비율 이상 덮이면 동물 칸
     fillChar: "ㅁ",      // 배경 칸이 비어 있을 때만 쓰는 글자
     lineDarken: 0.62,    // 귀·날개 같은 안쪽 선 = 동물색 × 이 값
+    rimDarken: 0.6,      // 실루엣 바깥 테두리 한 칸 = 동물색 × 이 값(굴곡이 선으로 보이게)
+    thinGlyphs: "ㅣㅡ|-_.,'`:;!?/\\()[]{}<>~^*+=¨˚°´˝·‥…",   // 색이 거의 안 실리는 가는 글자
+    denseGlyphs: "ㅁㅂㅍㅎㅌㄹㅊ",   // 동물 칸에서 가는 글자만 이걸로 바꿔 면이 또렷하게
     eyeColor: "#1e1e1e",
     saturate: 1.35,      // 동물색 채도 배율
     darken: 0.86,        // 동물색 밝기 배율(1=그대로)
@@ -15,7 +18,7 @@
     flowSpeed: 7,        // 글자가 외곽 띠를 따라 흐르는 속도(칸/초)
     flowFps: 14,         // 흐름 갱신 횟수(초당)
   };
-  const ORDER = ["32", "30"];
+  const ORDER = ["32", "30", "25", "31"];   // 맑은 하늘, 먹구름, 산, 노을
 
   const NS = "http://www.w3.org/2000/svg";
   const CELL = 12;
@@ -25,7 +28,6 @@
   const form = document.getElementById("ask");
   const input = document.getElementById("name");
   const msg = document.getElementById("msg");
-  const count = document.getElementById("count");
 
   const NAMES = {};
   for (const [k, a] of Object.entries(ANIMALS)) { NAMES[k] = k; NAMES[k + "s"] = k; NAMES[a.ko] = k; }
@@ -216,14 +218,16 @@
     c0 = Math.min(Math.max(c0, v.c0), Math.max(v.c0, v.c1 - sil.W + 1));
     r0 = Math.min(Math.max(r0, v.r0), Math.max(v.r0, v.r1 - sil.H + 1));
     an.fc = c0 + Math.floor(sil.W / 2); an.fr = r0 + sil.H - 1;
-    const col = vivid(ANIMALS[an.key].color), line = shade(col, CONFIG.lineDarken);
+    const col = vivid(ANIMALS[an.key].color), line = shade(col, CONFIG.lineDarken), rim = shade(col, CONFIG.rimDarken);
     const map = new Map();
     for (const p of sil.cells) {
       const rr = r0 + p.r, cc = c0 + p.c;
       if (rr < 0 || cc < 0 || rr >= sc.rows || cc >= sc.cols) continue;
       // 글자는 그 칸의 원래 배경 글자 그대로, 색만 동물 색으로
-      const i = rr * sc.cols + cc, ch = sc.cells[i].ch === " " ? CONFIG.fillChar : sc.cells[i].ch;
-      map.set(i, { ch, base: ch, color: p.kind === "eye" ? CONFIG.eyeColor : p.kind === "line" ? line : col });
+      const i = rr * sc.cols + cc, o = sc.cells[i].ch;
+      const ch = o === " " ? CONFIG.fillChar
+        : CONFIG.thinGlyphs.includes(o) ? CONFIG.denseGlyphs[(i * 7) % CONFIG.denseGlyphs.length] : o;
+      map.set(i, { ch, base: ch, color: p.kind === "eye" ? CONFIG.eyeColor : p.kind === "line" ? line : p.kind === "edge" ? rim : col });
     }
     // 흐름용: 띠마다 (칸 번호, 원래 글자) 순서
     an.flow = sil.rings.map(rg => {
@@ -352,21 +356,19 @@
     if (shift) { an.fc += shift; update(sc, an); }
   });
 
-  // ---------- 장면 넘기기 ----------
-  const pad = n => String(n).padStart(2, "0");
-  let cur = -1, S = [];
+  // ---------- 장면 바꾸기 (장면은 처음 볼 때 만듦) ----------
+  let cur = -1;
+  const S = ORDER.map(() => null);
   function show(i) {
     i = (i + S.length) % S.length;
     if (i === cur) return;
     end();
+    if (!S[i]) S[i] = buildScene(ORDER[i]);
     cur = i;
-    S.forEach((s, k) => s.svg.classList.toggle("on", k === i));
-    count.textContent = `${pad(i + 1)} / ${pad(S.length)}`;
+    S.forEach((s, k) => s && s.svg.classList.toggle("on", k === i));
   }
-  document.getElementById("next").onclick = () => show(cur + 1);
-  document.getElementById("prev").onclick = () => show(cur - 1);
   addEventListener("keydown", e => {
-    if (document.activeElement === input) return;
+    if (document.activeElement === input || document.querySelector(".overlay.open")) return;
     if (e.key === "ArrowRight") show(cur + 1);
     if (e.key === "ArrowLeft") show(cur - 1);
   });
@@ -397,7 +399,6 @@
     setTimeout(flowTick, 1000 / CONFIG.flowFps);
   }
 
-  S = ORDER.map(buildScene);
   if (!still) flowTick();
   const P = new URLSearchParams(location.search);
   show(+P.get("s") ? +P.get("s") - 1 : 0);
@@ -405,5 +406,6 @@
 
   // 확인용: ?demo=rabbit,dog,deer (차례로 등장)
   if (P.get("demo")) for (const k of P.get("demo").split(",")) if (ANIMALS[k]) spawn(S[cur], k);
-  window.__zoo = { S, spawn, update, CONFIG };
+  window.__zoo = { S, ORDER, spawn, update, show, CONFIG, get cur() { return cur; },
+                   add: key => { spawn(S[cur], key); setMsg(""); } };
 })();

@@ -18,7 +18,7 @@ COVER = 0.38      # 이 비율 이상 덮인 칸 = 동물 칸
 SCALE = 1.3       # 전체 크기 배율(칸 수 자체가 바뀜 — 글자 크기는 그대로)
 
 # 장면별 지평선(이 줄부터 땅). 땅 동물의 발은 이 줄 아래에만 놓임
-SCENES = {"32": {"horizon": 68}, "30": {"horizon": 63}}
+SCENES = {"32": {"horizon": 68}, "30": {"horizon": 63}, "25": {"horizon": 66}, "31": {"horizon": 65}}
 
 
 def E(cx, cy, rx, ry): return ("e", cx, cy, rx, ry)
