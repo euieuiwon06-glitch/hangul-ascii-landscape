@@ -220,7 +220,7 @@
     if (!key) { setMsg("없는 동물이에요 — " + Object.keys(ANIMALS).join(" · "), 5000); return; }
     spawn(S[cur], key);
     input.value = "";
-    setMsg("꾹 눌러 끌기 · 누른 채 휠로 크기 · 더블클릭 좌우반전", 5000);
+    setMsg("");
   });
 
   // ---------- 끌기 · 크기 · 반전 ----------
