@@ -11,6 +11,8 @@
   /* UI 글꼴: SUIT Thin (배경·동물 글자는 Noto Sans KR 그대로) */
   @font-face { font-family: 'SUIT'; font-weight: 100; font-display: swap;
                src: url('https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2.0.5/fonts/static/woff2/SUIT-Thin.woff2') format('woff2'); }
+  @font-face { font-family: 'SUIT'; font-weight: 400; font-display: swap;
+               src: url('https://cdn.jsdelivr.net/gh/sun-typeface/SUIT@2.0.5/fonts/static/woff2/SUIT-Regular.woff2') format('woff2'); }
   :root { --ink: #111; --ui: 'SUIT', 'Noto Sans KR', sans-serif; }
   html, body { margin: 0; height: 100%; background: #fff; overflow: hidden; }
   body { font-family: var(--ui); font-weight: 100; color: var(--ink); }
@@ -30,7 +32,7 @@
           background: rgba(255,255,255,.9); box-shadow: 0 1px 10px rgba(0,0,0,.1); font-size: 13px; }
   form.pill { width: min(220px, calc(100vw - 150px)); padding: 0 14px; }
   form input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; padding: 0;
-               font: 100 13px/1 var(--ui); color: #111; text-align: center; }
+               font: 400 13px/1 var(--ui); color: #111; text-align: center; }   /* 입력창만 SUIT Regular */
   form input::placeholder { color: #999; }
   #listBtn { border: 0; padding: 0 14px 0 16px; gap: 7px; cursor: pointer; white-space: nowrap;
              font: 100 12px/1 var(--ui); letter-spacing: .09em; }
@@ -131,10 +133,10 @@
   </div>
 </div>
 
-<script src="scenes.js?v=202611152307"></script>
-<script src="animals.js?v=202611152307"></script>
-<script src="sil.js?v=202611152307"></script>
-<script src="zoo.js?v=202611152307"></script>
-<script src="ui.js?v=202611152307"></script>
+<script src="scenes.js?v=202611152313"></script>
+<script src="animals.js?v=202611152313"></script>
+<script src="sil.js?v=202611152313"></script>
+<script src="zoo.js?v=202611152313"></script>
+<script src="ui.js?v=202611152313"></script>
 </body>
 </html>
