@@ -15,6 +15,9 @@
   #stage svg.on { opacity: 1; visibility: visible; transition: opacity .9s ease; }
   .bg text { transition: opacity .3s ease, transform .3s ease; }
   body.placing #stage { cursor: crosshair; }
+  /* 놓는 동안엔 입력창이 땅을 가리지 않게 흐리게 + 클릭 통과 */
+  form.pill, #msg { transition: opacity .25s ease; }
+  body.placing form.pill { opacity: .3; pointer-events: none; }
 
   .pill { position: fixed; left: 50%; transform: translateX(-50%);
           display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: 999px;
