@@ -363,31 +363,19 @@
   // ---------- 장면 바꾸기 (장면은 처음 볼 때 만듦) ----------
   let cur = -1;
   const S = ORDER.map(() => null);
-  // ---------- 지구본: 오른쪽 위 배경 글자를 지구본 무늬대로 검정으로 (육지 = 굵게, 바다 = 옅게) ----------
-  const GLOBE = [
-    "...###...",
-    ".####.##.",
-    "####..###",
-    "##.....##",
-    "#.....###",
-    "#....####",
-    ".#..####.",
-    "..#.###..",
-    "....##...",
-  ];
+  // ---------- 오른쪽 위 작은 원: 그 안의 배경 글자를 검정으로 (배경 고르기 버튼 자리) ----------
+  const DOT = 5;   // 원 지름(칸)
   const globeBtn = document.getElementById("globe");
   function placeGlobe(sc) {
-    const v = visible(sc), n = GLOBE.length, R = n / 2;
+    const v = visible(sc), n = DOT, R = n / 2;
     const c0 = v.c1 - n - 1, r0 = v.r0 + 1;
     const old = sc.globe || new Map(), map = new Map();
     for (let y = 0; y < n; y++)
       for (let x = 0; x < n; x++) {
         const dx = x + 0.5 - R, dy = y + 0.5 - R;
         if (dx * dx + dy * dy > R * R) continue;
-        const i = (r0 + y) * sc.cols + c0 + x, o = sc.cells[i].ch;
-        const land = GLOBE[y][x] === "#";
-        const ch = o === " " || (land && CONFIG.thinGlyphs.includes(o)) ? CONFIG.denseGlyphs[(i * 7) % CONFIG.denseGlyphs.length] : o;
-        map.set(i, land ? { ch, color: CONFIG.globeColor, weight: 900 } : { ch, color: CONFIG.globeColor, weight: 400, op: 0.42 });
+        const i = (r0 + y) * sc.cols + c0 + x;
+        map.set(i, { ch: sc.cells[i].ch === " " ? CONFIG.fillChar : sc.cells[i].ch, color: CONFIG.globeColor });
       }
     sc.globe = map;
     redraw(sc, new Set([...old.keys(), ...map.keys()]));
