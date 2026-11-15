@@ -9,6 +9,9 @@
     fillChar: "ㅁ",      // 배경 칸이 비어 있을 때만 쓰는 글자
     lineDarken: 0.62,    // 귀·날개 같은 안쪽 선 = 동물색 × 이 값
     eyeColor: "#1e1e1e",
+    saturate: 1.35,      // 동물색 채도 배율
+    darken: 0.86,        // 동물색 밝기 배율(1=그대로)
+    animalWeight: 900,   // 동물 칸 글자 굵기(배경은 그대로)
   };
   const ORDER = ["32", "30"];
 
@@ -120,6 +123,19 @@
     return sil;
   }
 
+  // 채도 올리고 살짝 진하게 (HSL)
+  function vivid(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    let r = (n >> 16) / 255, g = ((n >> 8) & 255) / 255, b = (n & 255) / 255;
+    const mx = Math.max(r, g, b), mn = Math.min(r, g, b), l0 = (mx + mn) / 2, d = mx - mn;
+    let h = 0, s0 = d === 0 ? 0 : d / (1 - Math.abs(2 * l0 - 1));
+    if (d) h = mx === r ? ((g - b) / d + 6) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    const s = Math.min(1, s0 * CONFIG.saturate), l = l0 * CONFIG.darken;
+    const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h % 2) - 1)), m = l - c / 2;
+    const [R, G, B] = h < 1 ? [c, x, 0] : h < 2 ? [x, c, 0] : h < 3 ? [0, c, x] : h < 4 ? [0, x, c] : h < 5 ? [x, 0, c] : [c, 0, x];
+    const f = v => Math.round((v + m) * 255).toString(16).padStart(2, "0");
+    return "#" + f(R) + f(G) + f(B);
+  }
   function shade(hex, k) {
     const n = parseInt(hex.slice(1), 16);
     const f = v => Math.round(v * k).toString(16).padStart(2, "0");
@@ -147,7 +163,7 @@
     c0 = Math.min(Math.max(c0, v.c0), Math.max(v.c0, v.c1 - sil.W + 1));
     r0 = Math.min(Math.max(r0, v.r0), Math.max(v.r0, v.r1 - sil.H + 1));
     an.fc = c0 + Math.floor(sil.W / 2); an.fr = r0 + sil.H - 1;
-    const col = ANIMALS[an.key].color, line = shade(col, CONFIG.lineDarken);
+    const col = vivid(ANIMALS[an.key].color), line = shade(col, CONFIG.lineDarken);
     const map = new Map();
     for (const p of sil.cells) {
       const rr = r0 + p.r, cc = c0 + p.c;
@@ -175,6 +191,8 @@
       }
       if (cell.el.textContent !== v.ch) cell.el.textContent = v.ch;
       if (cell.el.getAttribute("fill") !== v.color) cell.el.setAttribute("fill", v.color);
+      if (v === cell) cell.el.removeAttribute("font-weight");
+      else cell.el.setAttribute("font-weight", CONFIG.animalWeight);
     }
   }
   function hit(sc, i) {
