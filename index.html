@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>한글 풍경</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  html, body { margin: 0; height: 100%; background: #fff; overflow: hidden; }
+  #stage { position: fixed; inset: 0; }
+  #stage svg { position: absolute; inset: 0; width: 100%; height: 100%;
+               opacity: 0; transition: opacity .9s ease; }
+  #stage svg.on { opacity: 1; }
+  nav { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%);
+        display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: 999px;
+        background: rgba(255,255,255,.9); box-shadow: 0 1px 10px rgba(0,0,0,.1);
+        font: 13px/1 'Noto Sans KR', sans-serif; }
+  nav button { border: 0; background: none; padding: 10px 16px; border-radius: 999px;
+               color: #333; cursor: pointer; font: inherit; }
+  nav button:hover { background: rgba(0,0,0,.06); }
+  nav #next { background: #111; color: #fff; }
+  nav #next:hover { background: #333; }
+  nav #count { min-width: 64px; text-align: center; color: #555;
+               font-variant-numeric: tabular-nums; }
+</style>
+</head>
+<body>
+<div id="stage" aria-hidden="true"></div>
+<nav aria-label="장면 넘기기">
+  <button id="prev" aria-label="이전 장">← 이전</button>
+  <span id="count" aria-live="polite">01 / 04</span>
+  <button id="next" aria-label="다음 장">다음 →</button>
+</nav>
+<script src="scenes.js"></script>
+<script>
+(() => {
+  const NS = "http://www.w3.org/2000/svg";
+  const CELL = 12;
+  const { base, weight, scenes } = window.ASCII;
+  const stage = document.getElementById("stage");
+
+  // 장면 하나 = SVG 하나. 칸마다 tspan, 색은 원본 사진 그 칸의 색
+  function build(s) {
+    const W = s.cols * CELL, H = s.rows * CELL;
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
+    const g = document.createElementNS(NS, "g");
+    g.setAttribute("font-family", "'Noto Sans KR', sans-serif");
+    g.setAttribute("font-size", CELL * 1.22);
+    g.setAttribute("font-weight", weight);
+    g.setAttribute("text-anchor", "middle");
+    s.chars.forEach((line, r) => {
+      const t = document.createElementNS(NS, "text");
+      t.setAttribute("y", (r * CELL + base * CELL).toFixed(2));
+      const cols = s.colors[r];
+      [...line].forEach((ch, c) => {
+        if (ch === " ") return;
+        const sp = document.createElementNS(NS, "tspan");
+        sp.setAttribute("x", c * CELL + CELL / 2);
+        sp.setAttribute("fill", "#" + cols.substr(c * 6, 6));
+        sp.textContent = ch;
+        t.appendChild(sp);
+      });
+      g.appendChild(t);
+    });
+    svg.appendChild(g);
+    return svg;
+  }
+
+  const svgs = scenes.map(build);
+  svgs.forEach(s => stage.appendChild(s));
+
+  const pad = n => String(n).padStart(2, "0");
+  const count = document.getElementById("count");
+  let cur = -1;
+
+  // 마지막 장에서 '다음'을 누르면 첫 장으로 돌아감
+  function show(i) {
+    i = (i + scenes.length) % scenes.length;
+    if (i === cur) return;
+    cur = i;
+    svgs.forEach((s, k) => s.classList.toggle("on", k === i));
+    count.textContent = `${pad(i + 1)} / ${pad(scenes.length)}`;
+  }
+
+  document.getElementById("next").onclick = () => show(cur + 1);
+  document.getElementById("prev").onclick = () => show(cur - 1);
+  addEventListener("keydown", e => {
+    if (e.key === "ArrowRight") show(cur + 1);
+    if (e.key === "ArrowLeft") show(cur - 1);
+  });
+
+  const q = +new URLSearchParams(location.search).get("s");
+  show(q ? q - 1 : 0);
+})();
+</script>
+</body>
+</html>
