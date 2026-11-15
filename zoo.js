@@ -368,7 +368,7 @@
   const globeBtn = document.getElementById("globe");
   function placeGlobe(sc) {
     const v = visible(sc), n = DOT, R = n / 2;
-    const c0 = v.c1 - n - 1, r0 = v.r0 + 1;
+    const c0 = v.c1 - n - 1, r0 = v.r0 + 3;   // 위에서 3칸 아래
     const old = sc.globe || new Map(), map = new Map();
     for (let y = 0; y < n; y++)
       for (let x = 0; x < n; x++) {
