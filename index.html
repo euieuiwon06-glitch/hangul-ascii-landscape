@@ -9,15 +9,15 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
 <style>
   html, body { margin: 0; height: 100%; background: #fff; overflow: hidden; }
-  #stage { position: fixed; inset: 0; touch-action: manipulation; }
+  #stage { position: fixed; inset: 0; touch-action: none; user-select: none; -webkit-user-select: none; }
   #stage svg { position: absolute; inset: 0; width: 100%; height: 100%;
                opacity: 0; visibility: hidden; transition: opacity .9s ease, visibility 0s .9s; }
   #stage svg.on { opacity: 1; visibility: visible; transition: opacity .9s ease; }
-  .bg text { transition: opacity .3s ease, transform .3s ease; }
-  body.placing #stage { cursor: crosshair; }
-  /* 놓는 동안엔 입력창이 땅을 가리지 않게 흐리게 + 클릭 통과 */
-  form.pill, #msg { transition: opacity .25s ease; }
-  body.placing form.pill { opacity: .3; pointer-events: none; }
+  body.over-animal #stage { cursor: grab; }
+  body.dragging, body.dragging #stage { cursor: grabbing; }
+  /* 끄는 동안엔 입력창이 땅을 가리지 않게 흐리게 + 통과 */
+  form.pill { transition: opacity .2s ease; }
+  body.dragging form.pill { opacity: .3; pointer-events: none; }
 
   .pill { position: fixed; left: 50%; transform: translateX(-50%);
           display: flex; align-items: center; gap: 4px; padding: 6px; border-radius: 999px;
@@ -29,7 +29,7 @@
   nav button:hover { background: rgba(0,0,0,.06); }
   nav #next { background: #111; color: #fff; }
   nav #next:hover { background: #333; }
-  nav #count { min-width: 92px; text-align: center; color: #555; font-variant-numeric: tabular-nums; }
+  nav #count { min-width: 64px; text-align: center; color: #555; font-variant-numeric: tabular-nums; }
 
   form.pill { bottom: 24px; width: min(420px, calc(100vw - 32px)); box-sizing: border-box; padding: 6px 6px 6px 16px; }
   form span { color: #999; }
@@ -55,7 +55,7 @@
 <form id="ask" class="pill" autocomplete="off">
   <span aria-hidden="true">›</span>
   <input id="name" placeholder="동물 이름 (rabbit, 토끼 …)" aria-label="동물 이름" spellcheck="false">
-  <button type="submit">놓기</button>
+  <button type="submit">부르기</button>
 </form>
 <script src="scenes.js"></script>
 <script src="animals.js"></script>

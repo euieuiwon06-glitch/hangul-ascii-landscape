@@ -1,94 +1,129 @@
-// 한글 아스키 풍경 + 동물 등장 인터랙션
-// 배경과 동물 모두 같은 SVG · 같은 글꼴 · 같은 칸(CELL) 좌표를 쓴다.
+// 한글 아스키 풍경 + 동물
+// 동물은 따로 그리지 않는다: 실루엣이 차지하는 칸의 배경 글자를 동물 글자·색으로 "바꿔 끼운다".
+// 움직이거나 크기를 바꾸면 이전 칸은 원래 배경 글자로 돌아가고 새 칸이 바뀐다.
 (() => {
   const CONFIG = {
-    appearMs: 1000,          // 클릭 후 등장 애니메이션 전체 길이(0.8~1.2초 권장)
-    previewOpacity: 0.5,     // 미리보기 동물 투명도
-    previewBgOpacity: 0.22,  // 미리보기 중 겹친 배경 글자 투명도
-    lineInteriorOpacity: 0.12, // 라인 버전: 동물 안쪽 배경 글자 투명도
-    scatterCells: 1.6,       // 배치 순간 배경 글자가 밀려나는 거리(칸)
-    animalLightness: 0.22,   // 면 버전 동물 글자색 밝기(밑에 깔린 배경색의 색상은 유지)
-    lineLightness: 0.14,     // 라인 버전 외곽선 밝기(가는 기호라 더 진하게)
-    haloOpacity: 0.12,       // 실루엣 바로 바깥 한 칸 배경 글자 투명도(형태가 떠 보이게)
-    fillChar: "ㅁ",          // 면 버전 안쪽 글자
+    scale: 1.3,          // 처음 나타날 때 크기(도형 단위 → 칸 수)
+    scaleMin: 0.6, scaleMax: 2.6, scaleStep: 0.1,   // 누른 채 휠 1칸당
+    cover: 0.38,         // 칸이 이 비율 이상 덮이면 동물 칸
+    fillChar: "ㅁ",      // 면 글자
+    edgeDarken: 0.62,    // 외곽선 글자 = 동물색 × 이 값
+    eyeColor: "#1e1e1e",
   };
-  const ORDER = [
-    { id: "32", mode: "line", label: "라인" },
-    { id: "30", mode: "fill", label: "면" },
-  ];
+  const ORDER = ["32", "30"];
 
   const NS = "http://www.w3.org/2000/svg";
   const CELL = 12;
   const { base, weight, scenes: ALL } = window.ASCII;
-  const ANIMALS = window.ANIMALS;
-  const ZS = window.ZOO_SCENES;
+  const ANIMALS = window.ANIMALS, ZS = window.ZOO_SCENES;
   const stage = document.getElementById("stage");
   const form = document.getElementById("ask");
   const input = document.getElementById("name");
   const msg = document.getElementById("msg");
   const count = document.getElementById("count");
 
-  // 이름 → 동물 키 (영문·한글, 복수형 s 허용)
   const NAMES = {};
   for (const [k, a] of Object.entries(ANIMALS)) { NAMES[k] = k; NAMES[k + "s"] = k; NAMES[a.ko] = k; }
-  NAMES.bunny = "rabbit"; NAMES.puppy = "dog"; NAMES.kitty = "cat"; NAMES["개"] = "dog";
+  Object.assign(NAMES, { bunny: "rabbit", puppy: "dog", kitty: "cat", "개": "dog", "강아지": "dog" });
 
-  // ---------- 장면 만들기: 칸마다 <text> 하나 ----------
-  function buildScene(def) {
-    const s = ALL.find(x => x.id === def.id);
-    const W = s.cols * CELL, H = s.rows * CELL;
+  // ---------- 장면: 칸마다 <text> ----------
+  function buildScene(id) {
+    const s = ALL.find(x => x.id === id);
     const svg = document.createElementNS(NS, "svg");
-    svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+    svg.setAttribute("viewBox", `0 0 ${s.cols * CELL} ${s.rows * CELL}`);
     svg.setAttribute("preserveAspectRatio", "xMidYMid slice");
-    const mk = cls => {
-      const g = document.createElementNS(NS, "g");
-      g.setAttribute("class", cls);
-      g.setAttribute("font-family", "'Noto Sans KR', sans-serif");
-      g.setAttribute("font-size", CELL * 1.22);
-      g.setAttribute("font-weight", weight);
-      g.setAttribute("text-anchor", "middle");
-      svg.appendChild(g);
-      return g;
-    };
-    const bg = mk("bg"), animals = mk("animals"), preview = mk("preview");
-    preview.setAttribute("opacity", CONFIG.previewOpacity);
+    const g = document.createElementNS(NS, "g");
+    g.setAttribute("font-family", "'Noto Sans KR', sans-serif");
+    g.setAttribute("font-size", CELL * 1.22);
+    g.setAttribute("font-weight", weight);
+    g.setAttribute("text-anchor", "middle");
+    svg.appendChild(g);
     const cells = new Array(s.cols * s.rows);
     s.chars.forEach((line, r) => {
-      const cols = s.colors[r];
       [...line].forEach((ch, c) => {
-        const color = "#" + cols.substr(c * 6, 6);
-        let el = null;
-        if (ch !== " ") {
-          el = document.createElementNS(NS, "text");
-          el.setAttribute("x", c * CELL + CELL / 2);
-          el.setAttribute("y", (r * CELL + base * CELL).toFixed(2));
-          el.setAttribute("fill", color);
-          el.textContent = ch;
-          bg.appendChild(el);
-        }
-        cells[r * s.cols + c] = { el, ch, color };
+        const color = "#" + s.colors[r].substr(c * 6, 6);
+        cells[r * s.cols + c] = { ch, color, el: ch === " " ? null : makeText(g, r, c, ch, color) };
       });
     });
     stage.appendChild(svg);
-    return {
-      def, svg, bg, animals, preview, cells, cols: s.cols, rows: s.rows,
-      horizon: ZS[def.id].horizon,
-      owned: new Uint8Array(s.cols * s.rows),   // 동물이 차지한 칸(+여백)
-      touched: new Map(),                       // 미리보기로 바뀐 배경 칸
-    };
+    return { id, svg, g, cells, cols: s.cols, rows: s.rows, horizon: ZS[id].horizon, animals: [] };
+  }
+  function makeText(g, r, c, ch, color) {
+    const t = document.createElementNS(NS, "text");
+    t.setAttribute("x", c * CELL + CELL / 2);
+    t.setAttribute("y", (r * CELL + base * CELL).toFixed(2));
+    t.setAttribute("fill", color);
+    t.textContent = ch;
+    g.appendChild(t);
+    return t;
   }
 
-  // ---------- 동물 패턴 ----------
-  function pattern(key) {
-    const a = ANIMALS[key];
-    const out = [];
-    for (let r = 0; r < a.h; r++)
-      for (let c = 0; c < a.w; c++) {
-        const o = a.o[r][c], f = a.f[r][c] === "1";
-        if (o !== " ") out.push({ r, c, ch: o, edge: true });
-        else if (f) out.push({ r, c, ch: null, edge: false });
+  // ---------- 도형 → 칸 실루엣 (크기·반전마다 다시 계산) ----------
+  const cache = new Map();
+  function silhouette(key, scale, flip) {
+    const id = `${key}|${scale.toFixed(2)}|${flip ? 1 : 0}`;
+    if (cache.has(id)) return cache.get(id);
+    const a = ANIMALS[key], R = 8;
+    const W = Math.max(3, Math.round(a.w * scale)), H = Math.max(3, Math.round(a.h * scale));
+    const draw = (onlyLines) => {
+      const cv = document.createElement("canvas");
+      cv.width = W * R; cv.height = H * R;
+      const x = cv.getContext("2d", { willReadFrequently: true });
+      x.scale(scale * R, scale * R);
+      x.fillStyle = x.strokeStyle = "#000";
+      x.lineCap = x.lineJoin = "round";
+      for (const s of a.shapes) {
+        if (onlyLines !== (s[0] === "s")) continue;
+        x.beginPath();
+        if (s[0] === "e") { x.ellipse(s[1], s[2], s[3], s[4], 0, 0, Math.PI * 2); x.fill(); }
+        else if (s[0] === "p") { s[1].forEach(([px, py], i) => i ? x.lineTo(px, py) : x.moveTo(px, py)); x.closePath(); x.fill(); }
+        else { x.lineWidth = s[0] === "l" ? s[2] : 0.5; s[1].forEach(([px, py], i) => i ? x.lineTo(px, py) : x.moveTo(px, py)); x.stroke(); }
       }
-    return { key, a, cells: out };
+      const d = x.getImageData(0, 0, W * R, H * R).data;
+      const cov = new Float32Array(W * H);
+      for (let py = 0; py < H * R; py++)
+        for (let px = 0; px < W * R; px++) cov[((py / R) | 0) * W + ((px / R) | 0)] += d[(py * W * R + px) * 4 + 3] / 255;
+      for (let i = 0; i < cov.length; i++) cov[i] /= R * R;
+      return cov;
+    };
+    const cov = draw(false), lcov = draw(true);
+    const at = (arr, r, c) => (r < 0 || c < 0 || r >= H || c >= W) ? 0 : arr[r * W + c];
+    const inM = (r, c) => at(cov, r, c) >= CONFIG.cover;
+    const dirChar = (arr, r, c) => {
+      // 칸 덮임 비율의 기울기(안쪽 방향) → 윤곽선 방향 기호
+      const gx = at(arr, r - 1, c + 1) + 2 * at(arr, r, c + 1) + at(arr, r + 1, c + 1) - at(arr, r - 1, c - 1) - 2 * at(arr, r, c - 1) - at(arr, r + 1, c - 1);
+      const gy = at(arr, r + 1, c - 1) + 2 * at(arr, r + 1, c) + at(arr, r + 1, c + 1) - at(arr, r - 1, c - 1) - 2 * at(arr, r - 1, c) - at(arr, r - 1, c + 1);
+      if (Math.abs(gx) + Math.abs(gy) < 1e-3) return "-";
+      const ang = ((Math.atan2(-gy, gx) * 180 / Math.PI) + 360) % 180;   // 기울기 방향(수학 좌표)
+      if (ang < 22.5 || ang >= 157.5) return "|";       // 좌우로 바뀜 → 세로 선
+      if (ang < 67.5) return "\\";
+      if (ang < 112.5) return gy > 0 ? "-" : "_";       // 아래가 안쪽 → 윗변
+      return "/";
+    };
+    const out = [];
+    const eyes = new Set(a.eyes.map(([ex, ey]) => `${Math.floor(ey * scale)},${Math.floor(ex * scale)}`));
+    for (let r = 0; r < H; r++)
+      for (let c = 0; c < W; c++) {
+        if (!inM(r, c)) continue;
+        const edge = !inM(r - 1, c) || !inM(r + 1, c) || !inM(r, c - 1) || !inM(r, c + 1);
+        let ch, kind;
+        if (eyes.has(`${r},${c}`)) { ch = "*"; kind = "eye"; }
+        else if (edge) { ch = dirChar(cov, r, c); kind = "edge"; }
+        else if (lcov[r * W + c] > 0.12) { ch = dirChar(lcov, r, c); kind = "edge"; }
+        else { ch = CONFIG.fillChar; kind = "fill"; }
+        let cc = c;
+        if (flip) { cc = W - 1 - c; ch = ch === "/" ? "\\" : ch === "\\" ? "/" : ch; }
+        out.push({ r, c: cc, ch, kind });
+      }
+    const sil = { W, H, cells: out };
+    cache.set(id, sil);
+    return sil;
+  }
+
+  function shade(hex, k) {
+    const n = parseInt(hex.slice(1), 16);
+    const f = v => Math.round(v * k).toString(16).padStart(2, "0");
+    return "#" + f(n >> 16) + f((n >> 8) & 255) + f(n & 255);
   }
 
   // ---------- 좌표 ----------
@@ -100,298 +135,170 @@
   }
   function visible(sc) {
     const a = toGrid(sc, 0, 0), b = toGrid(sc, innerWidth - 1, innerHeight - 1);
-    return {
-      c0: Math.max(0, a.c), r0: Math.max(0, a.r),
-      c1: Math.min(sc.cols - 1, b.c), r1: Math.min(sc.rows - 1, b.r),
-    };
+    return { c0: Math.max(0, a.c), r0: Math.max(0, a.r), c1: Math.min(sc.cols - 1, b.c), r1: Math.min(sc.rows - 1, b.r) };
   }
 
-  // 커서 = 동물 발 가운데. 화면 안·땅 위·다른 동물과 안 겹치게 위치를 정함
-  function place(sc, pat, cur) {
-    const { a } = pat, v = visible(sc);
-    let c0 = cur.c - Math.floor(a.w / 2), r0 = cur.r - (a.h - 1);
-    const rMin = a.sky ? v.r0 : Math.max(v.r0, sc.horizon + 1 - (a.h - 1));
-    c0 = Math.min(Math.max(c0, v.c0), v.c1 - a.w + 1);
-    r0 = Math.min(Math.max(r0, rMin), v.r1 - a.h + 1);
-    if (free(sc, pat, r0, c0)) return { r0, c0, ok: true };
-    for (let d = 1; d <= 60; d++)
-      for (const dc of [-d, d]) {
-        const cc = c0 + dc;
-        if (cc < v.c0 || cc > v.c1 - a.w + 1) continue;
-        if (free(sc, pat, r0, cc)) return { r0, c0: cc, ok: true };
+  // ---------- 동물 = 바꿔 끼운 칸들 ----------
+  // an: { key, scale, flip, fc(발 가운데 열), fr(발 줄), map: Map(칸 → {ch, color}) }
+  function layout(sc, an) {
+    const sil = silhouette(an.key, an.scale, an.flip);
+    const v = visible(sc);
+    let c0 = an.fc - Math.floor(sil.W / 2), r0 = an.fr - sil.H + 1;
+    c0 = Math.min(Math.max(c0, v.c0), Math.max(v.c0, v.c1 - sil.W + 1));
+    r0 = Math.min(Math.max(r0, v.r0), Math.max(v.r0, v.r1 - sil.H + 1));
+    an.fc = c0 + Math.floor(sil.W / 2); an.fr = r0 + sil.H - 1;
+    const col = ANIMALS[an.key].color, edge = shade(col, CONFIG.edgeDarken);
+    const map = new Map();
+    for (const p of sil.cells) {
+      const rr = r0 + p.r, cc = c0 + p.c;
+      if (rr < 0 || cc < 0 || rr >= sc.rows || cc >= sc.cols) continue;
+      map.set(rr * sc.cols + cc, { ch: p.ch, color: p.kind === "eye" ? CONFIG.eyeColor : p.kind === "edge" ? edge : col });
+    }
+    return map;
+  }
+  function update(sc, an) {
+    const old = an.map || new Map();
+    an.map = layout(sc, an);
+    redraw(sc, new Set([...old.keys(), ...an.map.keys()]));
+  }
+  // 칸마다: 맨 위 동물 글자, 없으면 원래 배경 글자 — 글자와 색만 바뀜(흐림·이동 없음)
+  function redraw(sc, idx) {
+    for (const i of idx) {
+      const cell = sc.cells[i];
+      let v = cell;
+      for (const an of sc.animals) { const m = an.map && an.map.get(i); if (m) v = m; }
+      if (!cell.el) {
+        if (v === cell) continue;
+        cell.el = makeText(sc.g, Math.floor(i / sc.cols), i % sc.cols, " ", cell.color);
       }
-    return { r0, c0, ok: false };
-  }
-  function free(sc, pat, r0, c0) {
-    for (const p of pat.cells) if (sc.owned[(r0 + p.r) * sc.cols + c0 + p.c]) return false;
-    return true;
-  }
-
-  // 밑에 깔린 배경색의 색상을 살린 진한 색
-  function animalColor(sc, pat, r0, c0) {
-    let R = 0, G = 0, B = 0, n = 0;
-    for (const p of pat.cells) {
-      const col = sc.cells[(r0 + p.r) * sc.cols + c0 + p.c].color;
-      R += parseInt(col.substr(1, 2), 16); G += parseInt(col.substr(3, 2), 16); B += parseInt(col.substr(5, 2), 16); n++;
+      if (cell.el.textContent !== v.ch) cell.el.textContent = v.ch;
+      if (cell.el.getAttribute("fill") !== v.color) cell.el.setAttribute("fill", v.color);
     }
-    R /= n * 255; G /= n * 255; B /= n * 255;
-    const mx = Math.max(R, G, B), mn = Math.min(R, G, B);
-    let h = 0, s = 0;
-    if (mx !== mn) {
-      const d = mx - mn;
-      s = d / (1 - Math.abs(mx + mn - 1));
-      h = mx === R ? ((G - B) / d) % 6 : mx === G ? (B - R) / d + 2 : (R - G) / d + 4;
-      h *= 60;
-    }
-    s = Math.min(0.65, s * 1.2 + 0.1);
-    const L = sc.def.mode === "line" ? CONFIG.lineLightness : CONFIG.animalLightness;
-    return `hsl(${(h + 360) % 360} ${(s * 100).toFixed(0)}% ${(L * 100).toFixed(0)}%)`;
+  }
+  function hit(sc, i) {
+    for (let k = sc.animals.length - 1; k >= 0; k--) if (sc.animals[k].map.has(i)) return sc.animals[k];
+    return null;
   }
 
-  // ---------- 미리보기 ----------
-  let cur = -1, S = [], pending = null, last = null;
-
-  function ring(sc, pat, r0, c0) {
-    const inside = new Set(pat.cells.map(p => (r0 + p.r) * sc.cols + c0 + p.c));
-    const out = new Set();
-    for (const i of inside) {
-      const r = Math.floor(i / sc.cols), c = i % sc.cols;
-      for (const [dr, dc] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
-        const rr = r + dr, cc = c + dc;
-        if (rr < 0 || cc < 0 || rr >= sc.rows || cc >= sc.cols) continue;
-        const j = rr * sc.cols + cc;
-        if (!inside.has(j)) out.add(j);
+  // 처음 나올 자리: 땅 위 가운데부터, 다른 동물과 안 겹치는 곳
+  function spawn(sc, key) {
+    const v = visible(sc);
+    const sky = ANIMALS[key].sky;
+    const fr = sky ? Math.round(v.r0 + (sc.horizon - v.r0) * 0.45)
+                   : Math.min(v.r1 - 1, sc.horizon + Math.round((v.r1 - sc.horizon) * 0.55));
+    const mid = Math.round((v.c0 + v.c1) / 2);
+    let best = null;
+    search: for (let d = 0; d <= (v.c1 - v.c0) / 2; d += 2)
+      for (const fc of [mid - d, mid + d]) {
+        const an = { key, scale: CONFIG.scale, flip: false, fc, fr };
+        const m = layout(sc, an);
+        let overlap = 0;
+        for (const i of m.keys()) if (hit(sc, i)) overlap++;
+        if (!best || overlap < best.overlap) best = { an, overlap };
+        if (overlap === 0) break search;
       }
-    }
-    return { inside, out };
-  }
-  function push(sc, i, cy, cx, dist) {
-    const r = Math.floor(i / sc.cols), c = i % sc.cols;
-    let dx = c - cx, dy = r - cy;
-    const l = Math.hypot(dx, dy) || 1;
-    return `translate(${(dx / l * dist * CELL).toFixed(1)}px, ${(dy / l * dist * CELL).toFixed(1)}px)`;
+    const an = { ...best.an };
+    sc.animals.push(an);
+    update(sc, an);
+    return an;
   }
 
-  function showPreview(sc, pat, pos) {
-    const { r0, c0 } = pos, { a } = pat;
-    const cy = r0 + a.h / 2, cx = c0 + a.w / 2;
-    const { inside, out } = ring(sc, pat, r0, c0);
-    const next = new Map();
-    for (const i of inside) if (!sc.owned[i])
-      next.set(i, { op: CONFIG.previewBgOpacity, tf: push(sc, i, cy, cx, 0.25 + ((i * 7) % 5) / 10) });
-    for (const i of out) if (!sc.owned[i]) next.set(i, { op: 0.45, tf: push(sc, i, cy, cx, 0.35) });
-    for (const [i] of sc.touched) if (!next.has(i)) style(sc, i, "", "");
-    for (const [i, v] of next) style(sc, i, v.op, v.tf);
-    sc.touched = next;
-
-    // 동물 글자(반투명)
-    const color = animalColor(sc, pat, r0, c0);
-    sc.preview.replaceChildren();
-    sc.preview.setAttribute("opacity", pos.ok ? CONFIG.previewOpacity : CONFIG.previewOpacity * 0.35);
-    for (const p of pat.cells) {
-      const ch = p.edge ? p.ch : sc.def.mode === "fill" ? CONFIG.fillChar : null;
-      if (!ch) continue;
-      sc.preview.appendChild(glyph(r0 + p.r, c0 + p.c, ch, color));
-    }
+  // ---------- 입력 ----------
+  let hintTimer = 0;
+  function setMsg(t, ms = 0) {
+    msg.textContent = t;
+    clearTimeout(hintTimer);
+    if (ms) hintTimer = setTimeout(() => (msg.textContent = ""), ms);
   }
-  function clearPreview(sc) {
-    for (const [i] of sc.touched) style(sc, i, "", "");
-    sc.touched = new Map();
-    sc.preview.replaceChildren();
-  }
-  function style(sc, i, op, tf) {
-    const el = sc.cells[i].el;
-    if (!el || sc.owned[i]) return;
-    el.style.opacity = op;
-    el.style.transform = tf;
-  }
-  function glyph(r, c, ch, color) {
-    const t = document.createElementNS(NS, "text");
-    t.setAttribute("x", c * CELL + CELL / 2);
-    t.setAttribute("y", (r * CELL + base * CELL).toFixed(2));
-    t.setAttribute("fill", color);
-    t.textContent = ch;
-    return t;
-  }
-
-  // ---------- 배치 ----------
-  function commit(sc, pat, pos) {
-    const { r0, c0 } = pos, { a } = pat, T = CONFIG.appearMs;
-    const cy = r0 + a.h / 2, cx = c0 + a.w / 2;
-    const color = animalColor(sc, pat, r0, c0);
-    const { inside, out } = ring(sc, pat, r0, c0);
-    sc.preview.replaceChildren();
-    sc.touched = new Map();
-
-    // 차지한 칸 + 1칸 여백 기록(다음 동물 충돌 판정)
-    for (const i of inside) {
-      const r = Math.floor(i / sc.cols), c = i % sc.cols;
-      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-        const rr = r + dr, cc = c + dc;
-        if (rr >= 0 && cc >= 0 && rr < sc.rows && cc < sc.cols) sc.owned[rr * sc.cols + cc] = 2;
-      }
-    }
-
-    // Phase A — 배경 글자 분산
-    const dA = T * 0.4;
-    const interior = new Set(pat.cells.filter(p => !p.edge).map(p => (r0 + p.r) * sc.cols + c0 + p.c));
-    for (const i of inside) {
-      const el = sc.cells[i].el;
-      if (!el) continue;
-      el.style.transition = `opacity ${dA}ms ease-out, transform ${dA}ms ease-out`;
-      el.style.opacity = sc.def.mode === "line" && interior.has(i) ? CONFIG.lineInteriorOpacity : 0;
-      el.style.transform = push(sc, i, cy, cx, CONFIG.scatterCells * (0.6 + ((i * 13) % 7) / 10));
-    }
-    for (const i of out) {
-      const el = sc.cells[i].el;
-      if (!el || sc.owned[i] === 1) continue;
-      el.style.transition = `transform ${T * 0.3}ms ease-out`;
-      el.style.transform = push(sc, i, cy, cx, 0.5);
-    }
-
-    // Phase B — 동물 글자가 아래(발)에서 위로 차오르며 형성
-    const g = document.createElementNS(NS, "g");
-    sc.animals.appendChild(g);
-    const items = [];
-    for (const p of pat.cells) {
-      const ch = p.edge ? p.ch : sc.def.mode === "fill" ? CONFIG.fillChar : null;
-      if (!ch) continue;
-      const t = glyph(r0 + p.r, c0 + p.c, ch, color);
-      t.style.opacity = 0;
-      t.style.transform = `translate(0px, ${(CELL * 0.7).toFixed(1)}px)`;
-      g.appendChild(t);
-      items.push({ t, k: (a.h - p.r) + Math.abs(p.c - a.w / 2) * 0.25 });
-    }
-    const kMax = Math.max(...items.map(x => x.k));
-    const bStart = T * 0.2, bSpan = T * 0.5, dB = T * 0.3;
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      for (const { t, k } of items) {
-        t.style.transition = `opacity ${dB}ms ease-out ${bStart + (k / kMax) * bSpan}ms, transform ${dB}ms cubic-bezier(.2,.7,.2,1) ${bStart + (k / kMax) * bSpan}ms`;
-        t.style.opacity = 1;
-        t.style.transform = "translate(0px, 0px)";
-      }
-    }));
-
-    // Phase C·D — 밀려난 글자 제자리 + 고정
-    setTimeout(() => {
-      for (const i of out) {
-        const el = sc.cells[i].el;
-        if (!el || inside.has(i) || sc.owned[i] === 1) continue;
-        el.style.transition = `transform ${T * 0.35}ms ease-in-out, opacity ${T * 0.35}ms`;
-        el.style.transform = "";
-        el.style.opacity = CONFIG.haloOpacity;
-      }
-      for (const i of inside) {
-        const el = sc.cells[i].el;
-        if (!el) continue;
-        el.style.transition = `transform ${T * 0.3}ms ease-in-out, opacity ${T * 0.3}ms`;
-        el.style.transform = "";
-      }
-    }, T * 0.55);
-    setTimeout(() => {
-      for (const i of [...inside, ...out]) { const el = sc.cells[i].el; if (el) el.style.transition = ""; }
-      for (const { t } of items) { t.style.transition = ""; t.style.transform = ""; }
-    }, T + 200);
-    for (const i of inside) sc.owned[i] = 1;
-  }
-
-  // ---------- 입력 · 포인터 ----------
-  function setMsg(t) { msg.textContent = t; }
-
   form.addEventListener("submit", e => {
     e.preventDefault();
     const v = input.value.trim().toLowerCase();
     if (!v) return;
     const key = NAMES[v];
-    if (!key) {
-      setMsg("없는 동물이에요 — " + Object.keys(ANIMALS).join(" · "));
+    if (!key) { setMsg("없는 동물이에요 — " + Object.keys(ANIMALS).join(" · "), 5000); return; }
+    spawn(S[cur], key);
+    input.value = "";
+    setMsg("꾹 눌러 끌기 · 누른 채 휠로 크기 · 더블클릭 좌우반전", 5000);
+  });
+
+  // ---------- 끌기 · 크기 · 반전 ----------
+  let drag = null;   // { sc, an, dc, dr }
+  stage.addEventListener("pointerdown", e => {
+    if (e.button !== 0) return;
+    const sc = S[cur], g = toGrid(sc, e.clientX, e.clientY);
+    const an = hit(sc, g.r * sc.cols + g.c);
+    if (!an) return;
+    e.preventDefault();
+    sc.animals.splice(sc.animals.indexOf(an), 1);   // 잡은 동물을 맨 위로
+    sc.animals.push(an);
+    redraw(sc, new Set(an.map.keys()));
+    drag = { sc, an, dc: an.fc - g.c, dr: an.fr - g.r };
+    stage.setPointerCapture(e.pointerId);
+    document.body.classList.add("dragging");
+  });
+  stage.addEventListener("pointermove", e => {
+    const sc = S[cur], g = toGrid(sc, e.clientX, e.clientY);
+    if (!drag) {
+      document.body.classList.toggle("over-animal", !!hit(sc, g.r * sc.cols + g.c));
       return;
     }
-    pending = pattern(key);
-    setMsg(`${key} · 원하는 곳을 클릭해서 놓기 · Esc 취소`);
-    input.blur();
-    document.body.classList.add("placing");
-    if (last) move(last.x, last.y);
+    const fc = g.c + drag.dc, fr = g.r + drag.dr;
+    if (fc === drag.an.fc && fr === drag.an.fr) return;
+    drag.an.fc = fc; drag.an.fr = fr;
+    update(drag.sc, drag.an);
+  });
+  const end = () => { drag = null; document.body.classList.remove("dragging"); };
+  stage.addEventListener("pointerup", end);
+  stage.addEventListener("pointercancel", end);
+
+  addEventListener("wheel", e => {
+    if (!drag) return;
+    e.preventDefault();
+    const an = drag.an;
+    const s = Math.min(CONFIG.scaleMax, Math.max(CONFIG.scaleMin, an.scale + (e.deltaY < 0 ? 1 : -1) * CONFIG.scaleStep));
+    if (Math.abs(s - an.scale) < 1e-6) return;
+    an.scale = Math.round(s * 10) / 10;
+    update(drag.sc, an);
+  }, { passive: false });
+
+  stage.addEventListener("dblclick", e => {
+    const sc = S[cur], g = toGrid(sc, e.clientX, e.clientY);
+    const an = hit(sc, g.r * sc.cols + g.c);
+    if (!an) return;
+    // 제자리에서 뒤집히도록 실제 칸들의 가운데를 맞춤
+    const mid = m => { const c = [...m.keys()].map(i => i % sc.cols); return (Math.min(...c) + Math.max(...c)) / 2; };
+    const before = mid(an.map);
+    an.flip = !an.flip;
+    update(sc, an);
+    const shift = Math.round(before - mid(an.map));
+    if (shift) { an.fc += shift; update(sc, an); }
   });
 
-  function move(x, y) {
-    last = { x, y };
-    if (!pending) return;
-    const sc = S[cur];
-    const pos = place(sc, pending, toGrid(sc, x, y));
-    if (pending.pos && pending.pos.r0 === pos.r0 && pending.pos.c0 === pos.c0 && pending.pos.ok === pos.ok) return;
-    pending.pos = pos;
-    showPreview(sc, pending, pos);
+  // ---------- 장면 넘기기 ----------
+  const pad = n => String(n).padStart(2, "0");
+  let cur = -1, S = [];
+  function show(i) {
+    i = (i + S.length) % S.length;
+    if (i === cur) return;
+    end();
+    cur = i;
+    S.forEach((s, k) => s.svg.classList.toggle("on", k === i));
+    count.textContent = `${pad(i + 1)} / ${pad(S.length)}`;
   }
-  function cancel() {
-    if (!pending) return;
-    clearPreview(S[cur]);
-    pending = null;
-    document.body.classList.remove("placing");
-    setMsg("");
-  }
-
-  stage.addEventListener("pointermove", e => { if (e.pointerType === "mouse") move(e.clientX, e.clientY); });
-  stage.addEventListener("pointerdown", e => {
-    if (!pending) return;
-    const sc = S[cur];
-    if (e.pointerType !== "mouse") {
-      // 터치: 첫 탭은 위치 보기, 같은 자리를 한 번 더 탭하면 놓기
-      const before = pending.pos;
-      move(e.clientX, e.clientY);
-      if (!before || before.r0 !== pending.pos.r0 || before.c0 !== pending.pos.c0) return;
-    } else {
-      move(e.clientX, e.clientY);
-    }
-    if (!pending.pos.ok) { setMsg("여기는 자리가 없어요 — 다른 곳을 골라 주세요"); return; }
-    commit(sc, pending, pending.pos);
-    pending = null;
-    document.body.classList.remove("placing");
-    setMsg("");
-    input.value = "";
-    input.focus();
-  });
+  document.getElementById("next").onclick = () => show(cur + 1);
+  document.getElementById("prev").onclick = () => show(cur - 1);
   addEventListener("keydown", e => {
-    if (e.key === "Escape") { cancel(); input.focus(); return; }
     if (document.activeElement === input) return;
     if (e.key === "ArrowRight") show(cur + 1);
     if (e.key === "ArrowLeft") show(cur - 1);
   });
 
-  // ---------- 장면 넘기기 ----------
-  const pad = n => String(n).padStart(2, "0");
-  function show(i) {
-    i = (i + S.length) % S.length;
-    if (i === cur) return;
-    if (cur >= 0) cancel();
-    cur = i;
-    S.forEach((s, k) => s.svg.classList.toggle("on", k === i));
-    count.textContent = `${pad(i + 1)} / ${pad(S.length)} · ${S[i].def.label}`;
-  }
-  document.getElementById("next").onclick = () => show(cur + 1);
-  document.getElementById("prev").onclick = () => show(cur - 1);
-
   S = ORDER.map(buildScene);
-  const q = +new URLSearchParams(location.search).get("s");
-  show(q ? q - 1 : 0);
+  const P = new URLSearchParams(location.search);
+  show(+P.get("s") ? +P.get("s") - 1 : 0);
   input.focus();
 
-  // 확인용: ?demo=rabbit@40.80,deer@70.82 (발 위치 = 열.줄) 자동 배치, &pv=fox@100.80 미리보기
-  const P = new URLSearchParams(location.search);
-  const parse = s => s.split(",").filter(Boolean).map(t => {
-    const [k, rc] = t.split("@"); const [c, r] = rc.split(".").map(Number); return { k, c, r };
-  });
-  if (P.get("demo")) {
-    CONFIG.appearMs = +P.get("ms") || CONFIG.appearMs;
-    for (const d of parse(P.get("demo"))) {
-      const pat = pattern(d.k), sc = S[cur];
-      const pos = place(sc, pat, { c: d.c, r: d.r });
-      if (pos.ok) commit(sc, pat, pos);
-    }
-  }
-  if (P.get("pv")) {
-    const d = parse(P.get("pv"))[0], sc = S[cur];
-    const pat = pattern(d.k);
-    showPreview(sc, pat, place(sc, pat, { c: d.c, r: d.r }));
-  }
+  // 확인용: ?demo=rabbit,dog,deer (차례로 등장)
+  if (P.get("demo")) for (const k of P.get("demo").split(",")) if (ANIMALS[k]) spawn(S[cur], k);
+  window.__zoo = { S, spawn, update, CONFIG };
 })();

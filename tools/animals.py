@@ -18,7 +18,7 @@ COVER = 0.38      # 이 비율 이상 덮인 칸 = 동물 칸
 SCALE = 1.3       # 전체 크기 배율(칸 수 자체가 바뀜 — 글자 크기는 그대로)
 
 # 장면별 지평선(이 줄부터 땅). 땅 동물의 발은 이 줄 아래에만 놓임
-SCENES = {"32": {"horizon": 68, "mode": "line"}, "30": {"horizon": 63, "mode": "fill"}}
+SCENES = {"32": {"horizon": 68}, "30": {"horizon": 63}}
 
 
 def E(cx, cy, rx, ry): return ("e", cx, cy, rx, ry)
@@ -210,16 +210,40 @@ def preview(data, out):
     sheet.save(out)
 
 
+# 동물 실제 색(면 글자색). 외곽선은 JS에서 이 색을 더 진하게 씀
+COLORS = {
+    "rabbit": "#e994ab", "cat": "#d98a3a", "dog": "#c79a68", "deer": "#b06f3c", "elephant": "#8c98a6",
+    "fox": "#e06a2c", "bear": "#6e4a30", "squirrel": "#b9662e", "hedgehog": "#8d6b4c", "cow": "#3b3836",
+    "horse": "#8a5537", "sheep": "#e9e2d0", "pig": "#f0a2b4", "bird": "#4f8fd6", "duck": "#f0bf2a",
+}
+
+
+def shape_json(spec):
+    out = []
+    for sh in spec["shapes"]:
+        if sh[0] == "e":
+            out.append(["e", *sh[1:]])
+        elif sh[0] == "p":
+            out.append(["p", [list(p) for p in sh[1]]])
+        elif sh[0] == "l":
+            out.append(["l", [list(p) for p in sh[1]], sh[2]])
+        else:
+            out.append(["s", [list(p) for p in sh[1]]])
+    eyes = spec["eye"] if isinstance(spec["eye"], list) else [spec["eye"]]
+    return {"ko": spec["ko"], "w": spec["w"], "h": spec["h"], "eyes": [list(e) for e in eyes],
+            "sky": bool(spec.get("sky")), "shapes": out}
+
+
 def main():
-    data = {n: raster(s) for n, s in ANIMALS.items()}
+    # 브라우저가 크기(scale)마다 칸 실루엣을 다시 계산하므로 도형 원본을 내보냄
+    data = {n: {**shape_json(s), "color": COLORS[n]} for n, s in ANIMALS.items()}
     with open(os.path.join(ROOT, "animals.js"), "w", encoding="utf-8") as f:
         f.write("// tools/animals.py 로 생성 — 직접 수정하지 말 것\n")
         f.write("window.ANIMALS = " + json.dumps(data, ensure_ascii=False, separators=(",", ":")) + ";\n")
         f.write("window.ZOO_SCENES = " + json.dumps(SCENES) + ";\n")
     if len(sys.argv) > 1:
-        preview(data, sys.argv[1])
-    for n, d in data.items():
-        print(n, d["w"], "x", d["h"])
+        preview({n: raster(s) for n, s in ANIMALS.items()}, sys.argv[1])
+    print("animals:", len(data))
 
 
 if __name__ == "__main__":
