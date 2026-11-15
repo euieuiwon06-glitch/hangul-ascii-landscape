@@ -12,6 +12,8 @@
     saturate: 1.35,      // 동물색 채도 배율
     darken: 0.86,        // 동물색 밝기 배율(1=그대로)
     animalWeight: 900,   // 동물 칸 글자 굵기(배경은 그대로)
+    flowSpeed: 7,        // 글자가 외곽 띠를 따라 흐르는 속도(칸/초)
+    flowFps: 14,         // 흐름 갱신 횟수(초당)
   };
   const ORDER = ["32", "30"];
 
@@ -118,7 +120,7 @@
         if (flip) { cc = W - 1 - c; ch = ch === "/" ? "\\" : ch === "\\" ? "/" : ch; }
         out.push({ r, c: cc, ch, kind });
       }
-    const sil = { W, H, cells: out };
+    const sil = { W, H, cells: out, rings: rings(out) };
     cache.set(id, sil);
     return sil;
   }
@@ -136,6 +138,57 @@
     const f = v => Math.round((v + m) * 255).toString(16).padStart(2, "0");
     return "#" + f(R) + f(G) + f(B);
   }
+  // 외곽에서 안쪽으로 한 칸 두께의 띠(등고선)를 만들고, 각 띠의 칸을 외곽선 방향 순서로 잇는다
+  function rings(cells) {
+    const key = (r, c) => r * 10000 + c;
+    const pos = new Map(cells.map((p, k) => [key(p.r, p.c), k]));
+    const depth = new Array(cells.length).fill(-1);
+    let q = [];
+    cells.forEach((p, k) => {
+      if ([[1, 0], [-1, 0], [0, 1], [0, -1]].some(([dr, dc]) => !pos.has(key(p.r + dr, p.c + dc)))) { depth[k] = 0; q.push(k); }
+    });
+    while (q.length) {
+      const nq = [];
+      for (const k of q) for (const [dr, dc] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const j = pos.get(key(cells[k].r + dr, cells[k].c + dc));
+        if (j !== undefined && depth[j] < 0) { depth[j] = depth[k] + 1; nq.push(j); }
+      }
+      q = nq;
+    }
+    const byDepth = new Map();
+    cells.forEach((p, k) => {
+      if (p.kind === "eye" || p.kind === "line") return;   // 눈·안쪽 선은 제자리
+      if (!byDepth.has(depth[k])) byDepth.set(depth[k], []);
+      byDepth.get(depth[k]).push(k);
+    });
+    const out = [];
+    for (const [d, list] of [...byDepth].sort((a, b) => a[0] - b[0])) {
+      const left = new Set(list), seq = [];
+      let cur = list.reduce((a, b) => (cells[b].r < cells[a].r || (cells[b].r === cells[a].r && cells[b].c < cells[a].c)) ? b : a);
+      while (cur !== undefined) {
+        seq.push(cur); left.delete(cur);
+        const p = cells[cur];
+        let next, best = 1e9;
+        for (const [dr, dc] of [[0, 1], [1, 1], [1, 0], [1, -1], [0, -1], [-1, -1], [-1, 0], [-1, 1]]) {
+          const j = pos.get(key(p.r + dr, p.c + dc));
+          if (j === undefined || !left.has(j)) continue;
+          // 남은 이웃이 적은 쪽(선의 끝 방향)을 먼저 따라감 → 띠를 한 줄로 이음
+          let free = 0;
+          for (const [er, ec] of [[0, 1], [1, 0], [0, -1], [-1, 0]]) { const t = pos.get(key(cells[j].r + er, cells[j].c + ec)); if (t !== undefined && left.has(t)) free++; }
+          const cost = free + (dr && dc ? 0.5 : 0);
+          if (cost < best) { best = cost; next = j; }
+        }
+        if (next === undefined && left.size) {   // 끊긴 곳은 가장 가까운 칸으로 건너뜀
+          let bd = 1e9;
+          for (const j of left) { const dd = Math.abs(cells[j].r - p.r) + Math.abs(cells[j].c - p.c); if (dd < bd) { bd = dd; next = j; } }
+        }
+        cur = next;
+      }
+      out.push({ seq, dir: d % 2 ? -1 : 1 });
+    }
+    return out;
+  }
+
   function shade(hex, k) {
     const n = parseInt(hex.slice(1), 16);
     const f = v => Math.round(v * k).toString(16).padStart(2, "0");
@@ -170,8 +223,13 @@
       if (rr < 0 || cc < 0 || rr >= sc.rows || cc >= sc.cols) continue;
       // 글자는 그 칸의 원래 배경 글자 그대로, 색만 동물 색으로
       const i = rr * sc.cols + cc, ch = sc.cells[i].ch === " " ? CONFIG.fillChar : sc.cells[i].ch;
-      map.set(i, { ch, color: p.kind === "eye" ? CONFIG.eyeColor : p.kind === "line" ? line : col });
+      map.set(i, { ch, base: ch, color: p.kind === "eye" ? CONFIG.eyeColor : p.kind === "line" ? line : col });
     }
+    // 흐름용: 띠마다 (칸 번호, 원래 글자) 순서
+    an.flow = sil.rings.map(rg => {
+      const ids = rg.seq.map(k => (r0 + sil.cells[k].r) * sc.cols + c0 + sil.cells[k].c).filter(i => map.has(i));
+      return { ids, chars: ids.map(i => map.get(i).base), dir: rg.dir };
+    });
     return map;
   }
   function update(sc, an) {
@@ -313,7 +371,34 @@
     if (e.key === "ArrowLeft") show(cur - 1);
   });
 
+  // ---------- 흐름: 띠의 글자들이 외곽선 방향을 따라 한 칸씩 이동 ----------
+  const still = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let t0 = performance.now();
+  function flowTick() {
+    const sc = S[cur];
+    if (sc && sc.animals.length) {
+      const step = Math.floor((performance.now() - t0) / 1000 * CONFIG.flowSpeed);
+      const touched = new Set();
+      for (const an of sc.animals) {
+        if (!an.flow) continue;
+        for (const f of an.flow) {
+          const n = f.ids.length;
+          if (n < 3) continue;
+          const off = ((step * f.dir) % n + n) % n;
+          for (let j = 0; j < n; j++) {
+            const m = an.map.get(f.ids[j]);
+            const ch = f.chars[(j + off) % n];
+            if (m && m.ch !== ch) { m.ch = ch; touched.add(f.ids[j]); }
+          }
+        }
+      }
+      if (touched.size) redraw(sc, touched);
+    }
+    setTimeout(flowTick, 1000 / CONFIG.flowFps);
+  }
+
   S = ORDER.map(buildScene);
+  if (!still) flowTick();
   const P = new URLSearchParams(location.search);
   show(+P.get("s") ? +P.get("s") - 1 : 0);
   input.focus();
