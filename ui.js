@@ -39,7 +39,7 @@
     const b = document.createElement("button");
     b.className = "card";
     b.setAttribute("aria-label", `배경 ${k + 1}`);
-    b.innerHTML = `<img src="thumbs/${id}.jpg?v=202611152310" alt="" draggable="false">`;
+    b.innerHTML = `<img src="thumbs/${id}.jpg?v=202611152307" alt="" draggable="false">`;
     track.appendChild(b);
     return b;
   });
