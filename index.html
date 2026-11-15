@@ -31,13 +31,11 @@
   nav #next:hover { background: #333; }
   nav #count { min-width: 64px; text-align: center; color: #555; font-variant-numeric: tabular-nums; }
 
-  form.pill { bottom: 24px; width: min(420px, calc(100vw - 32px)); box-sizing: border-box; padding: 6px 6px 6px 16px; }
-  form span { color: #999; }
-  form input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; padding: 10px 8px;
-               font: 15px/1 'Noto Sans KR', sans-serif; color: #111; }
-  form button { border: 0; background: #111; color: #fff; border-radius: 999px; padding: 10px 16px;
-                font: inherit; cursor: pointer; }
-  #msg { position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%);
+  form.pill { bottom: 20px; width: min(220px, calc(100vw - 32px)); box-sizing: border-box; padding: 2px 14px; }
+  form input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; padding: 8px 0;
+               font: 13px/1 'Noto Sans KR', sans-serif; color: #111; text-align: center; }
+  form input::placeholder { color: #999; }
+  #msg { position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%);
          max-width: calc(100vw - 32px); padding: 8px 14px; border-radius: 999px;
          background: rgba(255,255,255,.9); font: 12px/1.4 'Noto Sans KR', sans-serif; color: #444;
          text-align: center; pointer-events: none; }
@@ -53,12 +51,10 @@
 </nav>
 <div id="msg" aria-live="polite"></div>
 <form id="ask" class="pill" autocomplete="off">
-  <span aria-hidden="true">›</span>
-  <input id="name" placeholder="동물 이름 (rabbit, 토끼 …)" aria-label="동물 이름" spellcheck="false">
-  <button type="submit">부르기</button>
+  <input id="name" placeholder="이름을 입력하세요" aria-label="동물 이름" spellcheck="false" enterkeyhint="go">
 </form>
-<script src="scenes.js?v=202611152228"></script>
-<script src="animals.js?v=202611152228"></script>
-<script src="zoo.js?v=202611152228"></script>
+<script src="scenes.js?v=202611152232"></script>
+<script src="animals.js?v=202611152232"></script>
+<script src="zoo.js?v=202611152232"></script>
 </body>
 </html>
